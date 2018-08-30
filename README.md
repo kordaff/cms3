@@ -2,7 +2,12 @@
 This will be the 3rd iteration of my mod_perl2 response handler that acts as a CMS using Apache and PostgreSQL.
 
 
-Added my TODO's for this module on http://userconfig.cf/ where I'll be testing it, but think I need to move the TODO's at least, off to http://perl-user.com/cms3-todos-4-userconfig since once I reconfigure Apache, the TODO's won't be on userconfig.cf anymore...
+There's a link to TODO's for this module linked off home page for http://perl-user.com   Easier to get to.
 
-I added the virtualhost section for userconfig.cf to my httpd.conf
-Now it responds with a barebones handler - spits out time and that is at present.
+Updated the virtualhost section for my test domain, userconfig.cf
+
+Now http://userconfig.cf spits out a time string.
+http://userconfig.cf/?debug shows a few debug variables including the dbh hash
+that stays the same when getting the same httpd process PID.
+This httpd.conf also includes the missing line to make the database connection
+persistant and to allow the dbname and dbuser to be hardcoded into the httpd.conf, letting cms3.pm be a little more portable/drop-in.
