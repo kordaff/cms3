@@ -16,49 +16,85 @@ use Encode;
 use utf8;
 
 # a global database handle and some debug variables
-my ($dbh,$dbname,$dbuser,$dbinit_counter,$args);
-# init_db();
+my ($dbh,$dbinit_counter);
+# variables to be populated from %ENV
+my ($method,$ip,$url,$dom,$query);
+# variables to get from cookies
+my ($useruuid,$usersession);
 
 sub init_db
   {
   my $r = shift;
   my %foo=$r->dir_config->get('foo');
-  $dbname=$foo{'dbname'};
-  $dbuser=$foo{'dbuser'};
+  my $dbname=$foo{'dbname'};
+  my $dbuser=$foo{'dbuser'};
   $dbh   = DBI->connect("dbi:Pg:dbname=$dbname",$dbuser,'',{AutoCommit=>1})or die $!;
   $dbinit_counter++;
+  check_cookies();
+  $method='';$dom='';$url='';$query='';
+  $method=$ENV{'REQUEST_METHOD'};
+  $dom=$ENV{'SERVER_NAME'};
+  ($url,$query)=split(/\?/,$ENV{'REQUEST_URI'});
   }
-sub debug_one
-  {
-  my $r = shift;
-  $r->print("query string: $args\n<br>");
-  $r->print("you tried to access $ENV{SERVER_NAME}$ENV{REQUEST_URI}<br>\n");
-  $r->print("(PID: $$)(dbh initialized: $dbinit_counter times)($dbh)\n<br>accessing $dbname as $dbuser\n<br>");
-
-  my $sth = $dbh->prepare("SELECT table_name FROM information_schema.tables WHERE table_schema='public' ");
-  $sth->execute();
-  my @row   = $sth->fetchrow_array;
-  print "<hr>Found tables: <ul>";
-  print "<li>$row[0]</li>";
-  print "</ul><hr>";
-
-  }  
 sub handler
   {
   my $r = shift;
-  $args='';
-  $args=$r->args();
   init_db($r);
-  check_cookies();  
-  $r->content_type('text/html');
-  $r->print("It is now: " . scalar(localtime) . "\n<br>");
-  if ($args eq 'debug')
-    { debug_one($r) }
 
+  if ($method eq 'GET'){handle_get(   $r )}
+  if ($method eq 'POST'){handle_post( $r )}
+  if ($method eq 'HEAD'){handle_head( $r )}
   return Apache2::Const::OK;
+  }
+sub show_env
+  {
+  my $r = shift;
+  $r->content_type('text/html');
+  foreach (sort keys %ENV){print "$_ $ENV{$_}<br>\n"}
+  return;
+  }
+sub handle_get
+  {
+  my $r=shift;
+  my $sth=$dbh->prepare("SELECT body from pages where url=? and domain=?");
+  $sth->execute($url,$dom);
+  my @row   = $sth->fetchrow_array;
+  my $body = $row[0];
+
+  $r->content_type('text/html');
+  $r->print($body);
+  }
+sub handle_post
+  {
+
+  }
+sub handle_head
+  {
+
   }
 sub check_cookies
   {
   return;
   }
+sub output_body
+  {
+  my($r,$body,$content_type)=@_;
+  # can't use Strict-Transport-Security: max-age=<expire-time>
+  # until SSL is enabled - maybe set to expire 1-2 days before cert does...
+  # $r->headers_out->set();
+  #
+  #    my $t=time()+86400*90;
+  #    my $maxage="max-age=$t";
+  #    $r->headers_out->set('Strict-Transport-Security' => $maxage        );
+  $r->headers_out->set('X-Frame-Options'           => 'sameorigin'   );
+  $r->headers_out->set('X-XSS-Protection'          => '1; mode=block');
+  #    $r->headers_out->set('Content-Security-Policy' => 'default-src https:');
+  $r->headers_out->set('X-Content-Type-Options'    => 'nosniff');
+  $r->headers_out->set('Referrer-Policy'           => 'same-origin'  );
+
+  $r->content_type($content_type);
+
+  return Apache2::Const::OK;
+  }
 1;
+
