@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<title>userconfig.cf/api/add_page</title>
+</head>
+<body>
+<form action="http://userconfig.cf/api/add_page" method="post">
+Page content:<br>
+<textarea name="page" cols=120 rows=28></textarea>
+<br>
+<input type="submit" value="submit">
+<input type="hidden" name="url"    value="/api/add_page">
+<input type="hidden" name="domain" value="userconfig.cf">
+<input type="hidden" name="useruuid" value="USERUUID">
+<input type="hidden" name="sessionuuid" value="???">
+</form>
+</body>
+</html>
