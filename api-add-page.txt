@@ -8,12 +8,12 @@
 <body>
 <form action="http://userconfig.cf/api/add_page" method="post">
 Page content:<br>
-<textarea name="page" cols=120 rows=28></textarea>
+<textarea name="page" cols=120 rows=28>TEXTAREA_VALUE</textarea>
 <br>
 <input type="submit" value="submit">
-<input type="hidden" name="url"    value="/api/add_page">
-<input type="hidden" name="domain" value="userconfig.cf">
-<input type="hidden" name="useruuid" value="USERUUID">
+<input type="hidden" name="url"    value="URL_VALUE">
+<input type="hidden" name="domain" value="DOMAIN_VALUE">
+<input type="hidden" name="useruuid" value="USERUUID_VALUE">
 <input type="hidden" name="sessionuuid" value="???">
 </form>
 </body>
