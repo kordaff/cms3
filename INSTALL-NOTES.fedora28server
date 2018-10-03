@@ -1,0 +1,65 @@
+After installing Fedora 28:
+---------------------------
+
+dnf install postgresql-server postgresql httpd git perl-Apache-DBI install mod_perl install perl-Apache-Reload install perl-DBD-Pg install perl-DateTime install perl-URI-Escape-XS perl-Crypt-Eksblowfish perl-Crypt-Random-Source perl-Email-Address perl-MIME-Lite perl-CGI perl-Readonly
+
+# should probably include which zone to add this to, but...
+firewall-cmd --add-service http
+firewall-cmd --add-service http --permanent
+
+# Next, configure PostgreSQL
+
+as postgres on Fedora:  initdb -D /var/lib/pgsql/data
+# for other systems, add /data to what pwd shows in postgres's home directory
+# on Arch Linux, it's /var/lib/postgres/data
+
+as root:  systemctl start postgresql
+
+as postgres:
+
+# add this line near bottom of ~postgres/data/pg_hba.conf if you're testing from another ip on the 192.168.1.0/24 subnet...
+
+host	all		all		192.168.1.0/24		trust
+
+createuser userconfig
+createdb userconfig -O userconfig
+
+as root: systemctl restart postgresql
+
+as a regular user (use useradd -m and passwd if you don't have a regular user yet) 
+
+change the password and domain and possibly the username you'll use to login to create/edit pages
+in the init-tables-userconfig.pl script.  You should also change the $del_passwd to something else
+too.  =)  Longer is better with a random mix of alphanumeric and special characters.
+
+my $password  = 'admin';
+my $del_passwd = 'abc123';   # so user can delete their own pages/notes/comments
+my $domain = 'mixer.perl-user.com';
+
+once happy with password and domain, run:
+perl init-tables-userconfig.pl
+
+-----------------
+To configure Apache2 on Fedora 28, all I had to do was edit userconfig-httpd.conf to change the server name to the domain I was using on this new Fedora 28 VM and 
+
+echo userconfig-httpd.conf >> /etc/httpd/conf/httpd.conf
+
+systemctl restart httpd
+
+And everything was good.
+
+Systemd does seem to get confused a little from time to time, when i start httpd as httpd, using systemctl is better =)  No more killing all the http processes by hand.
+But, to quickly figure out what's stopping a mod_perl handler from starting up...
+
+httpd
+
+and then tail -f /var/log/httpd/error_log &  after the first one.
+
+httpd
+
+fix errors
+
+repeat.
+
+Apache::DBI was the one module not listed in cms3.pm itself that would hang me up, now fifth in the
+dnf install list at the top.
