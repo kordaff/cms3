@@ -7,7 +7,7 @@
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 </head>
 <body>
-<form class="form" method="post" action="http://userconfig.cf/api/login">
+<form class="form" method="POST" action="http://__DOMAIN__/api/login">
 <h2>Login to Userconfig.cf</h2>
 <label>Username :</label>
 <input type="text" name="username" id="username">

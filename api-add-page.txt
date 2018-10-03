@@ -4,17 +4,33 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta charset="utf-8">
 <title>userconfig.cf/api/add_page</title>
+<style>
+html, body, textarea {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  height: 100%;
+}
+
+textarea {
+  height: 85vh;
+  width: 95%;
+}
+</style>
 </head>
 <body>
-<form action="http://userconfig.cf/api/add_page" method="post">
+<div>
+<form action="http://__DOMAIN__/api/add_page" method="POST">
 Page content:<br>
-<textarea name="page" cols=120 rows=28>TEXTAREA_VALUE</textarea>
-<br>
+<span style="width: 20px;"> </span> <textarea name="page">TEXTAREA_VALUE</textarea> <br>
 <input type="submit" value="submit">
 <input type="hidden" name="url"    value="URL_VALUE">
 <input type="hidden" name="domain" value="DOMAIN_VALUE">
 <input type="hidden" name="useruuid" value="USERUUID_VALUE">
 <input type="hidden" name="sessionuuid" value="???">
 </form>
+</div>
 </body>
 </html>
