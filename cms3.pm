@@ -35,16 +35,16 @@ my ( $cookie_useruuid, $usersession );
 # global variable to load api endpoint template bodies into
 my ( %api, %valid_api );
 
+# global snippets dispatch list
+my %snippets;
+
 Readonly::Scalar my $MAX_LENGTH_HASH => 16;
 Readonly::Scalar my $TWO_WEEKS       => 86_400 * 2;
 Readonly::Scalar my $SALT_MAX        => 12;
 Readonly::Scalar my $MIN_PW_LENGTH   => 8;
 
-#
-# TODO: add a variable to enable/disable /api/register here
-#
-
 sub init_db {
+# starting to look a lot more like a generic init section...
     my $r      = shift;
     my %foo    = $r->dir_config->get('foo');
     my $dbname = $foo{'dbname'};
@@ -58,6 +58,7 @@ sub init_db {
 # has to be restarted
 #
     load_api_templates($r);
+    setup_snippets();
     #
     $usersession     = 0;
     $cookie_useruuid = 0;
@@ -69,11 +70,10 @@ sub init_db {
     $query  = q//;
     $method = $ENV{'REQUEST_METHOD'};
     $dom    = $ENV{'SERVER_NAME'};
-    $ip     = $ENV{REMOTE_ADDR};
+    $ip     = $ENV{'REMOTE_ADDR'};
     ( $url, $query ) = split /[?]/smx, $ENV{'REQUEST_URI'};
     if ( !defined $query )             { $query = q// }
     if ( $dom eq 'www.userconfig.cf' ) { $dom   = 'userconfig.cf' }
-    if ( $dom eq 'meso.perl-user.com' ) { $dom   = 'vitriol.perl-user.com' }
 
     # $url =~ s/[][;\'"(){}\\]*//g;
     return;
@@ -82,12 +82,10 @@ sub init_db {
 sub load_api_templates {
     my $r = shift;
     my ( $sth, @row );
-    #
+
     # some api endpoints load a form, some are loaded from GET calls
     # some are just commands to call and don't require a page load.
-    #
-    # my @api_pages = qw(/api/add_page /api/login /api/register);
-    my @api_pages = qw(/api/add_page /api/login);
+    my @api_pages = qw(/api/add_page /api/login /api/register);
     foreach (@api_pages) {
         next if ( defined $api{$_} );
         $sth = $dbh->prepare('select body from pages where url=?')
@@ -99,15 +97,89 @@ sub load_api_templates {
 
     # load %valid_api if it hasn't loaded yet
     return if ( keys %valid_api );
-    #
+
     # need to restart httpd to reload new endpoints
-    #
     $sth = $dbh->prepare('select url from api_endpoints');
     $sth->execute();
     while ( @row = $sth->fetchrow_array ) {
         $valid_api{ $row[0] } = 1;
     }
     return;
+}
+
+sub setup_snippets {
+    %snippets = (
+        'dom'      => \&dom,
+        'created'  => \&created,
+        'allpages' => \&allpages,
+        'edit'     => \&edit,
+    );
+    return;
+}
+
+sub after_snippets {
+    my $body = shift;
+    while ( $body =~ /~~([\w-]+|[.]+)~~/smx ) {
+        my $match = $1;
+        if ( exists $snippets{$match} ) {
+            my $results = $snippets{$match}->();
+            $body =~ s/~~$match~~/$results/smx;
+        }
+        else {
+            my $results = "**error, snippet $match not found**";
+            $body =~ s/~~$match~~/$results/smx;
+        }
+    }
+    return $body;
+}
+
+sub dom {
+    return $dom;
+}
+
+sub edit {
+
+    #if ($skip_edit)
+    if ( $ip ne '72.201.204.99' ) { return; }
+    else {
+        return
+"<li><a href=\"$url?edit\"><span class=\"glyphicon glyphicon-pencil\"></span></a></li>";
+    }
+}
+
+sub created {
+    my ( @r, $sth );
+    $sth = $dbh->prepare(
+        'select creation_time from pages where url=? and domain=? and active');
+    $sth->execute( $url, $dom );
+    @r = $sth->fetchrow_array;
+    if ( $#r < 0 ) { return "Error, no rows for $dom$url in pages table\n"; }
+    my $dt = DateTime->from_epoch( epoch => $r[0] );
+
+    # unpolite to force my timezone but hey...
+    $dt->set_time_zone('America/Phoenix');
+    return $dt->hms . ' [MST] on ' . $dt->ymd;
+}
+
+sub allpages {
+    my ( @r, $ret, $sth );
+
+    # original SELECT included creation_time, but didnt do anything with it...
+    # could show creation_time and version_num,  maybe in different snippets.
+    $sth =
+      $dbh->prepare('SELECT url,domain from pages where domain=? and active')
+      or carp $STDERR;
+    $sth->execute($dom) or carp $STDERR;
+    @r = $sth->fetchrow_array;
+    if ( $#r < 0 ) { return "no pages found for $dom at all!!" }
+    else {
+        $ret =
+"<h4>Pages on $dom</h4><a href=\"http://$r[1]$r[0]\">$r[1]$r[0]</a><br>";
+    }
+    while ( @r = $sth->fetchrow_array ) {
+        $ret .= "<a href=\"http://$r[1]$r[0]\">$r[1]$r[0]</a><br>";
+    }
+    return $ret;
 }
 
 sub handler {
@@ -205,7 +277,9 @@ sub handle_api_call {
     if ( $url eq '/api/login' ) {
         output_body( $r, $api{'/api/login'}, 'text/html' );
     }
-#    if ( $url eq '/api/register' ) { output_body( $r, $api{'/api/register'}, 'text/html' ); }
+    if ( $url eq '/api/register' ) {
+        output_body( $r, $api{'/api/register'}, 'text/html' );
+    }
     if ( $url eq '/api/add_page' ) {
         output_body( $r, 'ERROR: please do not call /api/add_page directly',
             'text/html' );
@@ -249,9 +323,9 @@ sub register {
             $r->print("$maildom does not appear to be a valid domain\n");
             return;
         }
-# 
+#
 #  commenting this out - won't send email right now, just save the validation url
-# 
+#
 
 #        my $valid_maildom = `dig MX $maildom|grep MX|grep -v '^;' `;
 #        if(!$valid_maildom){$r->print("Sorry, $maildom isn't a valid MX server");return;}
@@ -327,11 +401,10 @@ sub process_the_page {
     if ( $url =~ /[.]xml$/smx )  { $content = 'text/xml' }
     if ( $url =~ /[.]js$/smx )   { $content = 'application/javascript' }
     if ( $url =~ /[.]css$/smx )  { $content = 'text/css' }
-    output_body( $r, $body, $content );
 
+    my $newbody = after_snippets($body);
+    output_body( $r, $newbody, $content );
     return;
-
-    #    print after_snippets($body);
 }
 
 sub create_page {
@@ -379,7 +452,7 @@ sub handle_post {
     if ( $#row == 0 ) {
         if ( $url eq '/api/add_page' ) { return store_page($r) }
         if ( $url eq '/api/login' )    { return login($r) }
-#        if ( $url eq '/api/register' ) { return register($r) }
+        if ( $url eq '/api/register' ) { return register($r) }
     }
     else { return no_api_endpoint($r) }
     return;
@@ -458,10 +531,10 @@ sub split_input {
 
 sub store_page {
     my $r = shift;
-    if ( $ip !~ /192[.]168[.]1[.]/ ) {
-        error_forbidden( $r, 'Error 403: posting not allowed, right now.  Check line #461 for correct subnet or ip match - default is to allow posts from 192.168.1.0/24 by regex 192.168.1. ' );
+    if ( $ip ne '72.201.204.99' ) {
+        error_forbidden( $r, 'Error 403: posting not allowed, right now.' );
         return;
-     }
+    }
 
     my %args = %{ split_input() };
 
