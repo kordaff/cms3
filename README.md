@@ -15,7 +15,7 @@ with each domain having a different user?   /api/delegate-domain, /api/add_domai
 
 And for a domain owner: /api/delegate-page-rw
 
-New ideas for my TODO list on http://userconfig.cf/
+New ideas for my TODO list on http://cms3.perl-user.com (site moved due to dot.tk suspending userconfig - who knows why.  Teach me to go with a free domain really)
 
 
 When installing, after httpd starts up with no errors in error_log, try these:
