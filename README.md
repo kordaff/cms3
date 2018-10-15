@@ -4,7 +4,8 @@ This is the 3rd iteration of my mod_perl2 response handler that acts as a CMS us
 
 This commit version has a lot of changes.  Different dbname and dbuser as I had
 someone suspend my domain, userconfig.cf   No notice, no warning.  All I do on
-it is post notes about what I'm working on with cms3...
+it is post notes about what I'm working on with cms3...  It must have been tasty
+for someone to pull that.  No more using free domains from dot.tk for me.
 
 So, new dbuser and dbname are cms3   Test domain is at cms3.perl-user.com
 I changed the example httpd.conf with the new variables.
