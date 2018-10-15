@@ -9,7 +9,8 @@ firewall-cmd --add-service http --permanent
 
 # Next, configure PostgreSQL
 
-as postgres on Fedora:  initdb -D /var/lib/pgsql/data
+# as postgres on Fedora:  initdb -D /var/lib/pgsql/data
+
 # for other systems, add /data to what pwd shows in postgres's home directory
 # on Arch Linux, it's /var/lib/postgres/data
 
@@ -17,32 +18,50 @@ as root:  systemctl start postgresql
 
 as postgres:
 
-# add this line near bottom of ~postgres/data/pg_hba.conf if you're testing from another ip on the 192.168.1.0/24 subnet...
+createuser cms3
+createdb cms3 -O cms3
 
-host	all		all		192.168.1.0/24		trust
+as root: 
 
-createuser userconfig
-createdb userconfig -O userconfig
+systemctl restart postgresql
 
-as root: systemctl restart postgresql
+# Fedora allows connections from the localhost to PostgreSQL
+#   have not tested putting Apache on one VM and PG on another
+#   I don't foresee any problems with that configuration, as long as you add
+#   a line to the end of pg_hba.conf for PostgreSQL and restart it
+#   would also need an appropriate listen line in postgresql.conf
 
-as a regular user (use useradd -m and passwd if you don't have a regular user yet) 
+# Debian is locked down a bit tighter than Fedora by default.
+# There, you'll need to run this in psql:
+#
+#  alter user cms3 with password 'someGOODpwHere';
+#
+# Then, edit cms3.pm from this:
+#
+# $dbh = DBI->connect( "dbi:Pg:dbname=$dbname", $dbuser, q//, { AutoCommit => 1 } ) or carp $STDERR; 
+#
+# To this:
+#
+# $dbh = DBI->connect( "dbi:Pg:dbname=$dbname", $dbuser, 'someGOODpwHere', { AutoCommit => 1 } ) or carp $STDERR;
+#
 
-change the password and domain and possibly the username you'll use to login to create/edit pages
-in the init-tables-userconfig.pl script.  You should also change the $del_passwd to something else
-too.  =)  Longer is better with a random mix of alphanumeric and special characters.
+change the passwords,email, domain and possibly the username you'll use to login to create/edit pages in the init-tables.pl script.  You should also change the $del_passwd to something else too.  =)  Longer is better with a random mix of alphanumeric and special characters.
 
-my $password  = 'admin';
-my $del_passwd = 'abc123';   # so user can delete their own pages/notes/comments
-my $domain = 'mixer.perl-user.com';
+once happy with passwords, email, and domain, run:
+perl init-tables.pl
+-----------------
+Installing cms3.pm
 
-once happy with password and domain, run:
-perl init-tables-userconfig.pl
+I usually put cms3 in a folder called MyApache2 that I create in vendor_perl
+Depending on the distro, you may have to find site_perl instead.  The mlocate
+package helps a great deal with this, just remember to run updatedb after installing it.  
 
 -----------------
-To configure Apache2 on Fedora 28, all I had to do was edit userconfig-httpd.conf to change the server name to the domain I was using on this new Fedora 28 VM and 
+To configure Apache2 on Fedora 28, all I had to do was edit example-httpd.conf to change the server name to the domain I was using on this new Fedora 28 VM set
+the listen to your machines IP and ServerName to your machines IP (this assumes
+that you have nothing else configured, ymmv greatly there, if you do)
 
-echo userconfig-httpd.conf >> /etc/httpd/conf/httpd.conf
+echo example-httpd.conf >> /etc/httpd/conf/httpd.conf
 
 systemctl restart httpd
 
@@ -61,5 +80,7 @@ fix errors
 
 repeat.
 
-Apache::DBI was the one module not listed in cms3.pm itself that would hang me up, now fifth in the
-dnf install list at the top.
+Apache::DBI was the one module not listed in cms3.pm itself that would hang me up, now fifth in the dnf install list at the top.
+
+
+# end

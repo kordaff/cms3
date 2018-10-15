@@ -2,12 +2,23 @@
 This is the 3rd iteration of my mod_perl2 response handler that acts as a CMS using Apache and PostgreSQL.
 
 
-This commit version includes recent work on /api/login /api/logout etc
-It also includes /api/register but I've left it disabled until other features are added.
+This commit version has a lot of changes.  Different dbname and dbuser as I had
+someone suspend my domain, userconfig.cf   No notice, no warning.  All I do on
+it is post notes about what I'm working on with cms3...
 
-I did notice a problem with my load-X.pl scripts.  I switched the two scripts to replace the UUID 
-and DOMAIN tags with the configured user's uuid and the site domain in the init script.
-Side effect, now the load-X.pl scripts need to find the uuid and domain and update the /api/X too
+So, new dbuser and dbname are cms3   Test domain is at cms3.perl-user.com
+I changed the example httpd.conf with the new variables.
+
+This is a pretty major increase of code, including a full rework and refactor
+of my store_page subroutine.   It shouldn't stomp on version_num for a 
+particular page now, even when the active page is rolled back to a previous 
+version.
+
+There was also a lot of changes to the database requiring a lot of queries to 
+become multi table queries.   The database is normalized quite a bit better.
+There is also a valid_domains table that gets initialized with the domain name
+specified in init-tables.pl and a domain of 'ALL' for /api urls.   Most 
+specifically, /api/login and /api/add_page get __DOMAIN__ tags replace with the current domain being accessed.
 
 I will test out a idea I have to fix that on my next Arch test install.
 The scripts should fix $body for each domain in the database.  Really need a domains table, perhaps
@@ -15,7 +26,7 @@ with each domain having a different user?   /api/delegate-domain, /api/add_domai
 
 And for a domain owner: /api/delegate-page-rw
 
-New ideas for my TODO list on http://cms3.perl-user.com (site moved due to dot.tk suspending userconfig - who knows why.  Teach me to go with a free domain really)
+New ideas for my TODO list on http://cms3.perl-user.com/
 
 
 When installing, after httpd starts up with no errors in error_log, try these:

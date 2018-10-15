@@ -30,7 +30,8 @@ my ($dbh);
 my ( $method, $ip, $url, $dom, $query );
 
 # variables to get from cookies
-my ( $cookie_useruuid, $usersession );
+my ( $useruuid, $session );
+my $whoami;
 
 # global variable to load api endpoint template bodies into
 my ( %api, %valid_api );
@@ -40,11 +41,15 @@ my %snippets;
 
 Readonly::Scalar my $MAX_LENGTH_HASH => 16;
 Readonly::Scalar my $TWO_WEEKS       => 86_400 * 2;
-Readonly::Scalar my $SALT_MAX        => 12;
-Readonly::Scalar my $MIN_PW_LENGTH   => 8;
+
+# Readonly::Scalar my $TWO_WEEKS     => 60;
+Readonly::Scalar my $SALT_MAX          => 12;
+Readonly::Scalar my $MIN_PW_LENGTH     => 8;
+Readonly::Scalar my $ALLOWED_LITERAL_3 => 3;
 
 sub init_db {
-# starting to look a lot more like a generic init section...
+
+    # starting to look a lot more like a generic init section...
     my $r      = shift;
     my %foo    = $r->dir_config->get('foo');
     my $dbname = $foo{'dbname'};
@@ -60,9 +65,8 @@ sub init_db {
     load_api_templates($r);
     setup_snippets();
     #
-    $usersession     = 0;
-    $cookie_useruuid = 0;
-    check_cookies();
+    $session  = 0;
+    $useruuid = 0;
     #
     $method = q//;
     $dom    = q//;
@@ -72,10 +76,23 @@ sub init_db {
     $dom    = $ENV{'SERVER_NAME'};
     $ip     = $ENV{'REMOTE_ADDR'};
     ( $url, $query ) = split /[?]/smx, $ENV{'REQUEST_URI'};
-    if ( !defined $query )             { $query = q// }
-    if ( $dom eq 'www.userconfig.cf' ) { $dom   = 'userconfig.cf' }
 
-    # $url =~ s/[][;\'"(){}\\]*//g;
+    if ( !defined $query )             { $query = q// }
+    
+    ##################################################
+    # you may need to uncomment/edit the line below: #
+    ##################################################
+
+    # if ( $dom eq 'www.YOUR_DOMAIN' ) { $dom   = 'YOUR_DOMAIN' }
+
+    ######################################################################
+    # otherwise, the www version of your domain will see different pages #
+    # also: add ServerAlias www.YOUR_DOMAIN in the httpd.conf            #
+    ######################################################################
+    
+    $whoami = q//;
+    check_cookies($r);
+
     return;
 }
 
@@ -88,7 +105,7 @@ sub load_api_templates {
     my @api_pages = qw(/api/add_page /api/login /api/register);
     foreach (@api_pages) {
         next if ( defined $api{$_} );
-        $sth = $dbh->prepare('select body from pages where url=?')
+        $sth = $dbh->prepare('SELECT body FROM pages WHERE url=?')
           or carp $STDERR;
         $sth->execute($_);
         @row = $sth->fetchrow_array;
@@ -99,7 +116,7 @@ sub load_api_templates {
     return if ( keys %valid_api );
 
     # need to restart httpd to reload new endpoints
-    $sth = $dbh->prepare('select url from api_endpoints');
+    $sth = $dbh->prepare('SELECT url FROM api_endpoints');
     $sth->execute();
     while ( @row = $sth->fetchrow_array ) {
         $valid_api{ $row[0] } = 1;
@@ -109,20 +126,34 @@ sub load_api_templates {
 
 sub setup_snippets {
     %snippets = (
-        'dom'      => \&dom,
-        'created'  => \&created,
-        'allpages' => \&allpages,
-        'edit'     => \&edit,
+        'dom'               => \&dom,
+        'url'		    => \&url,
+        'created'           => \&created,
+        'allpages'          => \&allpages,
+        'edit'              => \&edit,
+        'is_user_logged_in' => \&is_user_logged_in,
     );
     return;
 }
 
 sub after_snippets {
     my $body = shift;
+
     while ( $body =~ /~~([\w-]+|[.]+)~~/smx ) {
         my $match = $1;
         if ( exists $snippets{$match} ) {
+
+            # warn log_time_string(),"found a snippet match for $match\n";
+            if ( $query eq 'debug' ) {
+                warn log_time_string(),
+                  " after_snippets is replacing ~~$match~~ in $dom$url\n";
+            }
             my $results = $snippets{$match}->();
+            if ( !$results ) {
+                warn log_time_string(),
+"$dom$url match=$match snippet=$snippets{$match} results=$snippets{$match}->()\n";
+                return $body;
+            }
             $body =~ s/~~$match~~/$results/smx;
         }
         else {
@@ -136,21 +167,28 @@ sub after_snippets {
 sub dom {
     return $dom;
 }
+sub url {
+    return $url;
+}
 
 sub edit {
-
-    #if ($skip_edit)
-    if ( $ip ne '72.201.204.99' ) { return; }
+    if ( $ip !~ /^192[.]168[.]1[.]/ ) { return }
     else {
         return
 "<li><a href=\"$url?edit\"><span class=\"glyphicon glyphicon-pencil\"></span></a></li>";
     }
 }
 
+sub is_user_logged_in {
+    if   ($whoami) { return "Welcome: $whoami"; }
+    else           { return "<a href=\"http://$dom/api/login\">LOGIN</a>" }
+}
+
 sub created {
     my ( @r, $sth );
     $sth = $dbh->prepare(
-        'select creation_time from pages where url=? and domain=? and active');
+'SELECT creation_time FROM pages AS p,valid_domains AS d WHERE url=? and d.domain=? and active and p.domain_id=d.id'
+    );
     $sth->execute( $url, $dom );
     @r = $sth->fetchrow_array;
     if ( $#r < 0 ) { return "Error, no rows for $dom$url in pages table\n"; }
@@ -164,15 +202,14 @@ sub created {
 sub allpages {
     my ( @r, $ret, $sth );
 
-    # original SELECT included creation_time, but didnt do anything with it...
-    # could show creation_time and version_num,  maybe in different snippets.
-    $sth =
-      $dbh->prepare('SELECT url,domain from pages where domain=? and active')
-      or carp $STDERR;
+    $sth = $dbh->prepare(
+'SELECT url,d.domain FROM pages AS p,valid_domains AS d WHERE d.domain=? and active and p.domain_id=d.id'
+    ) or carp $STDERR;
     $sth->execute($dom) or carp $STDERR;
     @r = $sth->fetchrow_array;
     if ( $#r < 0 ) { return "no pages found for $dom at all!!" }
     else {
+  # todo: think about loading this from a snippets table, then do bunch of s///;
         $ret =
 "<h4>Pages on $dom</h4><a href=\"http://$r[1]$r[0]\">$r[1]$r[0]</a><br>";
     }
@@ -185,13 +222,11 @@ sub allpages {
 sub handler {
     my $r = shift;
     my $rc;
-
-    # bubble up $rc/return code from each sub to get final return $rc here.
-    # any subs returning with just return will get Apache2::Const::OK;
     init_db($r);
-    if ( $method eq 'GET' )  { $rc = handle_get($r) }
-    if ( $method eq 'POST' ) { $rc = handle_post($r) }
-    if ( $method eq 'HEAD' ) { $rc = handle_head($r) }
+    if ( $method eq 'GET' )    { $rc = handle_get($r)        }
+    if ( $method eq 'POST' )   { $rc = handle_post($r)       }
+    if ( $method eq 'HEAD' )   { $rc = handle_head($r)       }
+    if ( $method eq 'CONNECT') { $rc = error_no_connects($r) }
     if ($rc)                 { return $rc }
     else {
         return Apache2::Const::OK;
@@ -201,14 +236,22 @@ sub handler {
 sub show_env {
     my $r = shift;
     $r->content_type('text/html');
-    foreach ( sort keys %ENV ) { $r->print("$_ $ENV{$_}<br>\n") }
+    foreach ( sort keys %ENV )
+      {
+      if ($_ eq 'QUERY_STRING')
+        { $r->print("$_ ",uri_unescape($ENV{$_}),"<br>\n") }
+      elsif ($_ eq 'REQUEST_URI')
+        { $r->print("$_ ",uri_unescape($ENV{$_}),"<br>\n") }
+      else
+        { $r->print("$_ $ENV{$_}<br>\n") }
+      }
     return;
 }
 
 sub show_my_cookies {
     my $r       = shift;
     my %cookies = CGI::Cookie->fetch;
-    my $body    = "These are the cookies we have saved:<hr>\n";
+    my $body    = "These are the cookies saved for $whoami on $dom:<hr>\n";
     my $content = 'text/html';
 
     foreach ( sort keys %cookies ) {
@@ -232,9 +275,11 @@ sub delete_my_cookies {
         -value    => q/--/,
         'max-age' => '+1s'
     );
-    if ( $cookies{session_uuid} ) {
-        my $sth = $dbh->prepare('DELETE FROM sessions where sessionuuid=?');
-        $sth->execute($usersession);
+    if ($session) {
+        if ( $cookies{session_uuid} ) {
+            my $sth = $dbh->prepare('DELETE FROM sessions WHERE sessionuuid=?');
+            $sth->execute($session);
+        }
     }
 
     $r->err_headers_out->add( 'Set-Cookie' => $cookie1 );
@@ -252,9 +297,9 @@ sub logout {
     my %cookies = CGI::Cookie->fetch;
 
     if ( $cookies{session_uuid} ) {
-        $usersession = $cookies{session_uuid}->value;
+        $session = $cookies{session_uuid}->value;
     }
-    if ($usersession) {
+    if ($session) {
         my $cookie = CGI::Cookie->new(
             -name     => 'session_uuid',
             -value    => q/--/,
@@ -262,8 +307,8 @@ sub logout {
         );
         $r->err_headers_out->add( 'Set-Cookie' => $cookie );
 
-        my $sth = $dbh->prepare('DELETE FROM sessions where sessionuuid=?');
-        $sth->execute($usersession);
+        my $sth = $dbh->prepare('DELETE FROM sessions WHERE sessionuuid=?');
+        $sth->execute($session);
     }
     my $location = "http://$dom/";
     $r->headers_out->set( Location => $location );
@@ -273,9 +318,15 @@ sub logout {
 
 sub handle_api_call {
     my $r = shift;
+
+    # my ( @row, $sth );
+
     if ( !$valid_api{$url} ) { return error_404($r); }
     if ( $url eq '/api/login' ) {
-        output_body( $r, $api{'/api/login'}, 'text/html' );
+        my $newbody = $api{'/api/login'};
+        $newbody =~ s/__DOMAIN__/$dom/gsmx;
+        $newbody = after_snippets($newbody);
+        output_body( $r, $newbody, 'text/html' );
     }
     if ( $url eq '/api/register' ) {
         output_body( $r, $api{'/api/register'}, 'text/html' );
@@ -293,7 +344,7 @@ sub handle_api_call {
 
 sub register {
     my $r        = shift;
-    my %args     = %{ split_input() };
+    my %args     = %{ split_input($r) };
     my $password = $args{'password'};
     my $email    = $args{'email'};
     my $user     = $args{'username'};
@@ -358,7 +409,10 @@ sub register {
     ######################################################
     my $validation_uuid = APR::UUID->new->format;
 
-#     my $msg             = MIME::Lite->new( From    => 'webmaster@perl-user.com', To      => "$email", Subject => 'Please validate your email', Type    => 'text/html', Data => "<H3>Hello $user</H3>,<br><br>\nPlease click here to validate your email:<br><br>\n<a href='http://userconfig.cf/api/validate?$validation_uuid'>http://userconfig.cf/api/validate?$validation_uuid</a><br>Please ignore this email if you didnt register a user account on userconfig.cf.<br><br>Thank you<br><br>webmaster\@perl-user.cf aka Phil<br><br>\n",);
+#     my $msg             = MIME::Lite->new( From    => 'webmaster@perl-user.com', To      => "$email", Subject => 'Please validate your email', Type    => 'text/html', Data => "<H3>Hello $user</H3>,<br><br>\nPlease click here to validate your email:<br><br>\n<a href='http://$dom/api/validate?$validation_uuid'>http://$dom/api/validate?$validation_uuid</a><br>Please ignore this email if you didnt register a user account on $dom.<br><br>Thank you<br><br>webmaster\@perl-user.cf aka Phil<br><br>\n",);
+#
+#    Todo: fix that to get user email for owner of this domain.
+#
 #    MIME::Lite->send( 'smtp', 'perl-user.com', Debug => 1 );
 #    $msg->send();
 
@@ -369,16 +423,19 @@ sub handle_get {
     my $r = shift;
     my ( $sth, @row, $body );
     if ( $url =~ /^\/api\//smx ) { return handle_api_call($r) }
+
+    # if ($query eq 'debug'){
+    #  $r->print("looking for ",uri_unescape($url)," in db<br>\n");
+    # }
     $sth = $dbh->prepare(
-        'SELECT body from pages where url=? and domain=? and active=?');
-    $sth->execute( $url, $dom, 'TRUE' );
+'SELECT body FROM pages AS p,valid_domains AS d WHERE p.url=? and d.domain=? and p.active and p.domain_id=d.id'
+    );
+    $sth->execute( $url, $dom );
     @row = $sth->fetchrow_array;
     if ( $#row < 0 )    # can't find $dom$url in pages table
     {
-        if ( $query eq 'edit' ) { create_page($r) }
-        else {
-            return error_404($r);
-        }
+        if   ( $query eq 'edit' ) { create_page($r) }
+        else                      { return error_404($r) }
     }
     else                # $dom$url is in pages table
     {
@@ -403,16 +460,29 @@ sub process_the_page {
     if ( $url =~ /[.]css$/smx )  { $content = 'text/css' }
 
     my $newbody = after_snippets($body);
+    $newbody = uri_unescape($newbody);
     output_body( $r, $newbody, $content );
     return;
 }
 
 sub create_page {
-    my $r    = shift;
+    my $r = shift;
+    if ( !$session )
+      {
+      $url = uri_unescape($url);
+      output_body( $r, "Must be logged in to create page $url", 'text/html' );
+      return;
+      }
+
+    # my $sth=$dbh->prepare('SELECT u.useruuid,p.ownerid
+    #
+    # WIP - verify user owns the page...
+    #
     my $body = $api{'/api/add_page'};
-    $body =~ s/URL_VALUE/$url/smx;
-    $body =~ s/DOMAIN_VALUE/$dom/smx;
+    $body =~ s/__URL__/$url/smx;
+    $body =~ s/__DOMAIN__/$dom/gsmx;
     $body =~ s/TEXTAREA_VALUE//smx;
+    $body =~ s/__SESSION__/$session/smx;
     output_body( $r, $body, 'text/html' );
     return;
 }
@@ -420,22 +490,41 @@ sub create_page {
 sub edit_page {
     my $r            = shift;
     my $page_to_edit = shift;
-    my $body         = $api{'/api/add_page'};
-    $body =~ s/URL_VALUE/$url/smx;
-    $body =~ s/DOMAIN_VALUE/$dom/smx;
+
+    if ( !$session )
+      {
+      $url = uri_unescape($url);
+      output_body( $r, "Must be logged in to edit page $url", 'text/html' );
+      return;
+      }
+
+    my $body = $api{'/api/add_page'};
     $body =~ s/TEXTAREA_VALUE/$page_to_edit/smx;
+    $body =~ s/__DOMAIN__/$dom/gsmx;
+    $body =~ s/__SESSION__/$session/smx;
+    $body = uri_unescape($body);
+    $body =~ s/__URL__/$url/smx;
+
     output_body( $r, $body, 'text/html' );
-    $r->print("url=$url");
     return;
 }
 
 sub error_404 {
     my $r = shift;
+    $url = uri_unescape($url);
+    output_body( $r, "<h5>Error 404: Couldn't find a page matching </h5> <h3>$dom$url</h3><h5> in the database</h5>", 'text/html' );
     $r->status(Apache2::Const::NOT_FOUND);
-    output_body( $r, "Error 404: Couldn't find $dom$url in the database",
-        'text/html' );
-    return Apache2::Const::NOT_FOUND;
+    #    return Apache2::Const::NOT_FOUND;
+    return;
 }
+
+sub error_no_connects
+  {
+  my $r = shift;
+  output_body( $r, "Error 403: Proxying not allowed", 'text/html' );
+  $r->status(Apache2::Const::FORBIDDEN);
+  return;
+  }
 
 sub no_api_endpoint {
     my $r = shift;
@@ -445,8 +534,10 @@ sub no_api_endpoint {
 }
 
 sub handle_post {
-    my $r   = shift;
-    my $sth = $dbh->prepare('SELECT url from api_endpoints where url=?');
+    my $r = shift;
+
+    #     print "got to handle_post dom=$dom url=$url\n";
+    my $sth = $dbh->prepare('SELECT url FROM api_endpoints WHERE url=?');
     $sth->execute($url);
     my @row = $sth->fetchrow_array;
     if ( $#row == 0 ) {
@@ -460,28 +551,22 @@ sub handle_post {
 
 sub login {
     my $r    = shift;
-    my %args = %{ split_input() };
-    my $sth =
-      $dbh->prepare('select password,useruuid from user_data where username=?');
+    my %args = %{ split_input($r) };
+    my $sth  = $dbh->prepare(
+        'SELECT password,useruuid,username FROM user_data WHERE username=?');
     $sth->execute( $args{username} );
     my @row = $sth->fetchrow_array;
     if ( check_pw( $args{password}, $row[0] ) ) {
-        #
-        #
-        add_session();
-        #
-        # add_session() isnt written yet
-        #
+
         my $session_uuid = APR::UUID->new->format;
-        my $useruuid     = $row[1];
+        my $set_useruuid = $row[1];
         my $now          = time;
-        my $last_access  = $now;
 
         my $location = "http://$dom/";
 
         my $cookie1 = CGI::Cookie->new(
             -name     => 'useruuid',
-            -value    => $useruuid,
+            -value    => $set_useruuid,
             'max-age' => '+36M',
         );
 
@@ -493,10 +578,11 @@ sub login {
         #
         # we'll load the max-age for sessions from a user setting later...
         #
+
         $sth = $dbh->prepare(
-'INSERT INTO sessions (sessionuuid,useruuid,last_login,last_access,remote_addr) values (?,?,?,?,?)'
+"INSERT INTO sessions (sessionuuid,remote_addr,last_access,last_login,domain_id,userid) SELECT '$session_uuid','$ip',$now,$now,d.id,u.id FROM valid_domains AS d, user_data AS u WHERE d.domain='$dom' and u.username=?"
         );
-        $sth->execute( $session_uuid, $useruuid, $now, $last_access, $ip );
+        $sth->execute( $args{'username'} );
 
         $r->err_headers_out->add( 'Set-Cookie' => $cookie1 );
         $r->err_headers_out->add( 'Set-Cookie' => $cookie2 );
@@ -518,64 +604,98 @@ sub add_session {
 }
 
 sub split_input {
+    my $r = shift;
     my %args;
     my $data = <STDIN>;
     my @vars = split /&/smx, $data;
     foreach (@vars) {
         my ( $x, $y ) = split /=/smx;
-        $args{$x} = uri_unescape($y);
+        $args{$x} = $y;
     }
+
+    if ( exists $args{'url'} ) { $args{'url'} = uri_unescape( $args{'url'} ); }
+    if ( exists $args{'page'} ) {
+        $args{'page'} = Encode::decode_utf8( $args{'page'} );
+        $args{'page'} =~ s/%7E/~/gsmx;
+    }
+
     if ( exists $args{page} ) { $args{page} =~ s/[+]/ /gsmx }
     return ( \%args );
 }
 
+sub get_page_info
+  {
+  my ($u,$d)=@_;
+  my ($sth, @row);
+  $sth = $dbh->prepare('SELECT version_num,p.userid,p.domain_id,u.username FROM pages AS p, valid_domains AS d, user_data AS u WHERE p.domain_id=d.id and url=? and d.domain=? and d.owner_id = u.id ORDER BY version_num DESC LIMIT 1');
+  $sth->execute($u,$d);
+  @row=$sth->fetchrow_array;
+  if (@row)
+    { return ($row[0]+1,$row[1],$row[2],$row[3]) }
+  else
+    { 
+    $sth=$dbh->prepare('SELECT owner_id,id FROM valid_domains where domain=?'); 
+    $sth->execute($d);
+    @row=$sth->fetchrow_array;
+    if (@row) { return (1,$row[0],$row[1],'-newpage-' ) }
+    else { return (-1,-1,-1,-1) }
+    }
+  }
+sub deactivate_old_versions
+  {
+  my ($u,$did)=@_;
+  my $sth=$dbh->prepare('UPDATE pages SET active=FALSE WHERE url=? and domain_id=?') or carp $STDERR;
+  $sth->execute( $u,$did ) or carp $STDERR;
+  return;
+  }
 sub store_page {
     my $r = shift;
-    if ( $ip ne '72.201.204.99' ) {
+    my ( $sth, @row, $domain_id, %args, $new_version, $owner_uuid );
+    if ( $ip !~ /^192[.]168[.]1[.]/ ) {
         error_forbidden( $r, 'Error 403: posting not allowed, right now.' );
         return;
     }
+    %args = %{ split_input($r) };
+    my ($next_version,$page_userid,$page_did,$page_ownername);
 
-    my %args = %{ split_input() };
+    ($next_version,$page_userid,$page_did,$page_ownername) = 
+	get_page_info($args{url},$args{domain});
 
-    my $sth = $dbh->prepare(
-        'SELECT version_num from pages where url=? and domain=? and active=?');
-    $sth->execute( $args{url}, $args{domain}, 'TRUE' );
-    my @row = $sth->fetchrow_array;
-    my $new_version;
-    if ( $#row == 0 )    # found a single row = good, one version active
-    {
-        $new_version = $row[0];
-        $sth         = $dbh->prepare(
-'update pages set active=FALSE where version_num=? and url=? and domain=?'
-        );
-        $sth->execute( $new_version, $args{url}, $args{domain} );
-        $new_version++;
-    }
-    elsif ( $#row < 0 ) { $new_version = 1; }    # no $dom/$url in db, add it
-    else {
-        $r->status(Apache2::Const::HTTP_INTERNAL_SERVER_ERROR);
-        $r->content_type('text/html');
-        $r->print('Error 500: something went horribly wrong');
+    if ($next_version == -1)
+      {print "Error, no owner_id or id found for $args{domain}\n";return}
+    if ($next_version > 1 && $whoami ne $page_ownername)
+      {print "Oops, you don't own this page\n";return}
 
-        # and should never happen...
-        return Apache2::Const::HTTP_INTERNAL_SERVER_ERROR;
-    }
-    $sth = $dbh->prepare(
-'INSERT INTO pages (body,url,domain,creation_time,username,useruuid,remote_addr,active,version_num) values (?,?,?,?,?,?,?,?,?)'
-    );
+#    print "$whoami $next_version $page_userid $page_did $page_ownername\n";
+
+    if ($next_version > 1)
+      {
+      deactivate_old_versions($args{url},$page_did)
+      }
+
+    $sth=$dbh->prepare('INSERT INTO pages (body,url,domain_id,creation_time,userid,remote_addr,active,version_num) values (?,?,?,?,?,?,?,?)');
     my $t = time;
-    $sth->execute( $args{page}, $args{url}, $args{domain}, $t, 'admin',
-        '68489091-f591-4ba8-993c-a7421d688e8e',
-        $ip, 'TRUE', $new_version );
+    $sth->execute($args{page}, $args{url}, $page_did, $t, $page_userid, $ip, 'TRUE', $next_version );
     $r->headers_out->set( Location => "http://$args{domain}$args{url}" );
     $r->status(Apache2::Const::REDIRECT);
     return Apache2::Const::REDIRECT;
-}
+  }
 
 sub now {
     my $dt = DateTime->now();
     return $dt->year . q/-/ . $dt->month . q/-/ . $dt->day . q/ / . $dt->hms;
+}
+
+sub log_time_string {
+    my $dt = DateTime->now();
+    $dt->set_time_zone('America/Phoenix');
+    return
+        '['
+      . $dt->day_abbr . q/ /
+      . $dt->month_abbr . q/ /
+      . $dt->day . q/ /
+      . $dt->hms . q/ /
+      . $dt->year . ' MST]';
 }
 
 sub error_forbidden {
@@ -591,49 +711,61 @@ sub handle_head {
     return Apache2::Const::OK;
 }
 
-sub check_cookies {
+sub retr_cookies {
 
-    # my ( $cookie_useruuid, $usersession );
-    #   -name      => 'useruuid',
-    #   -name      => 'session_uuid',
+    # sets $useruuid and $session if cookies exist for them
     my %cookies = CGI::Cookie->fetch;
-    if ( $cookies{useruuid} ) {
-        $cookie_useruuid = $cookies{useruuid}->value;
-    }
-    if ( $cookie_useruuid !~ /^[a-f\d-]*$/asmx ) { $usersession = 0; return }
-    if ( $cookies{session_uuid} ) {
-        $usersession = $cookies{session_uuid}->value;
-    }
-    if ( !$usersession ) { return }
-    if ( $usersession eq q/--/ ) { $usersession = 0; return }
-    my $sth = $dbh->prepare(
-'SELECT last_access,id from sessions where sessionuuid=? order by id desc limit 1'
+    if ( $cookies{useruuid} )     { $useruuid = $cookies{useruuid}->value; }
+    if ( $cookies{session_uuid} ) { $session  = $cookies{session_uuid}->value; }
+    return;
+}
+
+sub check_cookies {
+    my $r = shift;
+    my ( $t, $sth, @row );
+
+    retr_cookies();
+    if ( !$session ) { return }
+    if ( $useruuid !~ /^[a-f\d-]*$/asmx ) { $session = 0; return }
+    if ( $session eq q/--/ ) { $session = 0; return }
+    $sth = $dbh->prepare(
+'SELECT last_access,s.id,remote_addr,username FROM sessions as s,user_data as u WHERE sessionuuid=? and remote_addr=? '
     );
-    $sth->execute($usersession);
-    my @row = $sth->fetchrow_array;
+    $sth->execute( $session, $ip );
+    @row = $sth->fetchrow_array;
+    $t   = time;
+    if ( $#row < 0 ) { $session = 0; return }    # invalid cookies/session
+    else {
 
-    my $t = time;
-    if ( $#row < 0 ) {
-
-        # invalid cookies/session
-        $usersession = 0;
-    }
-    else    # 1 or more rows, if more than 1 row, remove the extras from this ip
-    {
         if ( $t - $row[0] > $TWO_WEEKS ) {
-            $usersession = 0;
+            $sth = $dbh->prepare('delete from sessions where id=?');
+            $sth->execute( $row[1] ) or carp $STDERR;
+            warn log_time_string(), ' Session is ', $t - $row[0],
+" past expiration, removing expired session $row[1] for $session from table sessions\n";
+            $session = 0;   # should remove session from db and remove cookie...
+            remove_session_cookie($r);
+            return;
         }    # expired session
         else {
-            $dbh->do(
-                "update sessions set last_access='$t' where id='$row[1]' ");
+            $dbh->do("UPDATE sessions set last_access='$t' WHERE id='$row[1]'");
 
-        }    # good, refresh last_access
-        if ( $#row > 0 ) {
-            $dbh->do(
-"delete from sessions where sessionuuid='$usersession' and id<'$row[1]'"
-            );
+# warn log_time_string(), "Session for $row[3] is ", $t - $row[0], " since last access: $session\n";
+            $whoami = $row[$ALLOWED_LITERAL_3];
         }
     }
+    return;
+}
+
+sub remove_session_cookie {
+    my $r = shift;
+
+    # no redirect
+    my $cookie = CGI::Cookie->new(
+        -name     => 'session_uuid',
+        -value    => q/--/,
+        'max-age' => '+1s',
+    );
+    $r->headers_out->add( 'Set-Cookie' => $cookie );
     return;
 }
 
@@ -687,4 +819,3 @@ sub crypt_pw {
 }
 
 1;
-

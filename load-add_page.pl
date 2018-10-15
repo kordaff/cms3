@@ -4,7 +4,7 @@ use strict;
 use warnings;
 use DBD::Pg;
 
-my $dbh = DBI->connect("dbi:Pg:dbname=userconfig",'userconfig','',{AutoCommit=>1})or die $!;
+my $dbh = DBI->connect("dbi:Pg:dbname=cms3",'cms3','',{AutoCommit=>1})or die $!;
 my (@row,$sth,$query);
 
 my $body;
@@ -14,5 +14,6 @@ my $body;
   $body = <FILE>;
   close FILE;
 }
+
 $sth=$dbh->do("UPDATE pages set body='$body' where url='/api/add_page' ");
 

@@ -1,14 +1,14 @@
 <!DOCTYPE html>
 <html lang="en">
 <head> 
-<title>Login Page for userconfig.cf</title>
+<title>Login Page for ~~dom~~</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta charset="utf-8">
 <meta http-equiv="X-UA-Compatible" content="IE=edge">
 </head>
 <body>
 <form class="form" method="POST" action="http://__DOMAIN__/api/login">
-<h2>Login to Userconfig.cf</h2>
+<h2>Login to __DOMAIN__</h2>
 <label>Username :</label>
 <input type="text" name="username" id="username">
 <label>Password :</label>

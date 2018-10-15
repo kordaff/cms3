@@ -3,7 +3,7 @@
 <head>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta charset="utf-8">
-<title>userconfig.cf/api/add_page</title>
+<title>~~dom~~/api/add_page</title>
 <style>
 html, body, textarea {
   box-sizing: border-box;
@@ -26,10 +26,9 @@ textarea {
 Page content:<br>
 <span style="width: 20px;"> </span> <textarea name="page">TEXTAREA_VALUE</textarea> <br>
 <input type="submit" value="submit">
-<input type="hidden" name="url"    value="URL_VALUE">
-<input type="hidden" name="domain" value="DOMAIN_VALUE">
-<input type="hidden" name="useruuid" value="USERUUID_VALUE">
-<input type="hidden" name="sessionuuid" value="???">
+<input type="hidden" name="url"    value="__URL__">
+<input type="hidden" name="domain" value="__DOMAIN__">
+<input type="hidden" name="sessionuuid" value="__SESSION__">
 </form>
 </div>
 </body>

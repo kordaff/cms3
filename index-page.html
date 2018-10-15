@@ -1,0 +1,34 @@
+<html>
+<head><title>Home Page / Documentation</title></head><body>
+
+<a href="http://~~dom~~~~url~~?edit">edit</a> <span style="background: #ACF;">~~is_user_logged_in~~</span>
+<hr>
+~~allpages~~
+
+<p>Another snippet you can see as the admin user editing this page - it shows allpages found for this domain name.
+<p>Snippets are hard coded into cms3.pm   They match alphanumeric, -, and .   They are surrounded by two tildes
+~~ in front and behind.
+<p>The handler replaces them with the output of their subroutine, which has access to the global variables set by the loading of the page, like $dbh, $dom, and $url.   A lot of caution has to be taken when adding new snippets.
+
+<h4>Editing a page</h4>
+<p>First you have to be logged in as the admin user.   Additional users have not been tested or implemented
+<p>Next, to edit page /y, go to http://~~dom~~/y and add ?edit to the url in the location bar.
+<p>It would look like this: <a href="http://~~dom~~/y?edit">http://~~dom~~/y?edit</a>
+<p>Edit the html/css etc in the form, click submit.
+<p>I will be adding a facility or three for non-admin users to put markdown in various places (status, notes, etc)
+
+<h4>Adding a new page</h4>
+<p>Basically the same as editing an existing page, just pick the url you want and add ?edit to the end.
+
+<h4>Login</h4>
+<p>Go to <a href="http://~~dom~~/api/login">  http://~~dom~~/api/login </a>
+
+<h4>Logout</h4>
+<p>Go to <a href="http://~~dom~~/api/logout">  http://~~dom~~/api/logout </a>
+
+<h4>Cookies</h4>
+<p>Go to <a href="http://~~dom~~/api/show_my_cookies"> To see the cookies set for this domain. </a>
+<p>Go to <a href="http://~~dom~~/api/delete_my_cookies"> To DELETE all cookies set for this domain. </a>
+
+
+</body></html>
