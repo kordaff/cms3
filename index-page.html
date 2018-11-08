@@ -21,7 +21,7 @@
 <p>Basically the same as editing an existing page, just pick the url you want and add ?edit to the end.
 
 <h4>Deactivating a page</h4>
-<p>To deactivate a page, enter domain/url?delete, then enter your delete password
+<p>To deactivate a page, enter http://~~dom~~/url?delete, then enter your delete password
 <p>This will set it to inactive.  To remove inactive pages do this:
 <pre>
 psql cms3 cms3
@@ -35,7 +35,7 @@ DELETE from pages WHERE not active;
 <p>Go to <a href="http://~~dom~~/api/logout">  http://~~dom~~/api/logout </a>
 
 <h4>Change Passwords</h4>
-To change your login or delete passwords, go to dom/api/change_pw.  Change either or both passwords
+To change your login or delete passwords, go to http://~~dom~~/api/change_pw.  Change either or both passwords
 
 <h4>Cookies</h4>
 <p>Go to <a href="http://~~dom~~/api/show_my_cookies"> To see the cookies set for this domain. </a>
