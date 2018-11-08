@@ -21,7 +21,7 @@ use Email::Address;
 use MIME::Lite;    # may have issues - old module, needs replaced.
 use CGI::Cookie;
 use Readonly;
-our $VERSION = 3.0;
+our $VERSION = 3.2;
 
 # the global database handle
 my ($dbh);
