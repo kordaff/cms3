@@ -1,5 +1,7 @@
 #!/usr/bin/perl
 #
+# bumped to v3.2
+
 use strict;
 use warnings;
 use DBD::Pg;

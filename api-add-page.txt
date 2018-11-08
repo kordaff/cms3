@@ -8,12 +8,10 @@
 html, body, textarea {
   box-sizing: border-box;
 }
-
 html, body {
   margin: 0;
   height: 100%;
 }
-
 textarea {
   height: 85vh;
   width: 95%;
