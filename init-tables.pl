@@ -23,7 +23,8 @@ my $ALL_domain_id   = 0;
 ##################
 my $password   = 'admin';
 my $del_passwd = '123';
-my $email = 'root@perl-user.com';
+my $email = 'change_me@perl-user.com';
+my $domain = 'some-test-vm.perl-user.com';
 ##################
 
 print "May need to generate randomness here...\n";
@@ -34,7 +35,6 @@ my $encrypt_delpw = encrypt_password($del_passwd);
 my $uuid  = APR::UUID->new->format;
 my $t     = time;
 
-my $domain = 'impeach2.perl-user.com';
 
 print "Creating tables....\n";
 create_table_pages();
@@ -97,24 +97,15 @@ sub create_table_user_data {
 sub create_table_api_endpoints {
     $sth = $dbh->do("CREATE TABLE api_endpoints (url text); ") or die $!;
 
-    $sth =
-      $dbh->do("INSERT INTO api_endpoints(url) values ('/api/add_page'   )");
-    $sth =
-      $dbh->do("INSERT INTO api_endpoints(url) values ('/api/add_comment')");
-    $sth =
-      $dbh->do("INSERT INTO api_endpoints(url) values ('/api/add_note'   )");
-    $sth =
-      $dbh->do("INSERT INTO api_endpoints(url) values ('/api/login'      )");
-
-#   $sth = $dbh->do("INSERT INTO api_endpoints(url) values ('/api/register'   )");
-    $sth =
-      $dbh->do("INSERT INTO api_endpoints(url) values ('/api/delete_page')");
-    $sth = $dbh->do(
-        "INSERT INTO api_endpoints(url) values ('/api/show_my_cookies')");
-    $sth = $dbh->do(
-        "INSERT INTO api_endpoints(url) values ('/api/delete_my_cookies')");
+    $sth = $dbh->do("INSERT INTO api_endpoints(url) values ('/api/add_page'   )");
+    $sth = $dbh->do("INSERT INTO api_endpoints(url) values ('/api/login'      )");
+    $sth = $dbh->do("INSERT INTO api_endpoints(url) values ('/api/delete_page')");
+    $sth = $dbh->do("INSERT INTO api_endpoints(url) values ('/api/show_my_cookies')");
+    $sth = $dbh->do("INSERT INTO api_endpoints(url) values ('/api/delete_my_cookies')");
     $sth = $dbh->do("INSERT INTO api_endpoints(url) values ('/api/show_env')");
     $sth = $dbh->do("INSERT INTO api_endpoints(url) values ('/api/logout')");
+    $sth = $dbh->do("INSERT INTO api_endpoints(url) values ('/api/change_pw')");
+
     print "Created table: api_endpoints\n";
 }
 

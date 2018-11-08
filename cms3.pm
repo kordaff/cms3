@@ -21,7 +21,7 @@ use Email::Address;
 use MIME::Lite;    # may have issues - old module, needs replaced.
 use CGI::Cookie;
 use Readonly;
-our $VERSION = 3.1;
+our $VERSION = 3.0;
 
 # the global database handle
 my ($dbh);
@@ -40,9 +40,7 @@ my ( %api, %valid_api );
 my %snippets;
 
 Readonly::Scalar my $MAX_LENGTH_HASH => 16;
-Readonly::Scalar my $TWO_WEEKS       => 86_400 * 2;
-
-# Readonly::Scalar my $TWO_WEEKS     => 60;
+Readonly::Scalar my $TWO_WEEKS       => 86_400 * 14;
 Readonly::Scalar my $SALT_MAX          => 12;
 Readonly::Scalar my $MIN_PW_LENGTH     => 8;
 Readonly::Scalar my $ALLOWED_LITERAL_3 => 3;
@@ -84,6 +82,7 @@ sub init_db {
     ##################################################
 
     # if ( $dom eq 'www.YOUR_DOMAIN' ) { $dom   = 'YOUR_DOMAIN' }
+    if ( $dom eq 'www.perl-user.com' ) { $dom   = 'perl-user.com' }
 
     ######################################################################
     # otherwise, the www version of your domain will see different pages #
@@ -102,7 +101,7 @@ sub load_api_templates {
 
     # some api endpoints load a form, some are loaded from GET calls
     # some are just commands to call and don't require a page load.
-    my @api_pages = qw(/api/add_page /api/login /api/register);
+    my @api_pages = qw(/api/add_page /api/login /api/register /api/delete_page /api/change_pw);
     foreach (@api_pages) {
         next if ( defined $api{$_} );
         $sth = $dbh->prepare('SELECT body FROM pages WHERE url=?')
@@ -132,6 +131,11 @@ sub setup_snippets {
         'allpages'          => \&allpages,
         'edit'              => \&edit,
         'is_user_logged_in' => \&is_user_logged_in,
+	'updated'	    => \&updated,
+        'version'	    => \&version,
+        'bytes'		    => \&bytes,
+        'words_stripped'    => \&words_stripped,
+	'generate_pw'	    => \&generate_pw,
     );
     return;
 }
@@ -171,7 +175,75 @@ sub url {
     return $url;
 }
 
+sub updated
+  {
+  my ($sth,@row);
+  $sth   = $dbh->prepare("select creation_time from pages as p,valid_domains as d where p.url=? and d.domain=? and d.id=p.domain_id and p.active");
+  $sth->execute($url,$dom);
+  @row = $sth->fetchrow_array;
+  if ($#row < 0)
+    {return "error: creation_time not found";}
+  my $dt = DateTime->from_epoch(epoch => $row[0]);
+  $dt->set_time_zone('America/Phoenix');
+  return $dt->hms." [MST] on ".$dt->ymd;
+  }
+
+sub version
+  {
+  my ($sth,@row);
+  $sth   = $dbh->prepare("select version_num from pages as p,valid_domains as d where p.url=? and d.domain=? and d.id=p.domain_id and p.active");
+  $sth->execute($url,$dom);
+  @row = $sth->fetchrow_array;
+  if ($#row < 0)
+    {return "error: version_num not found";}
+  else
+    { return $row[0] }
+  }
+
+sub bytes
+  {
+  my ($sth,@row);
+  $sth = $dbh->prepare("select body from pages as p,valid_domains as d where p.url=? and d.domain=? and d.id=p.domain_id and p.active");
+  $sth->execute($url,$dom);
+  @row = $sth->fetchrow_array;
+  if ($#row < 0)
+    {return "error: strange, body not found..."}
+  else
+    {
+    my $body=$row[0];
+    $body =~ s/<[^<]*>//g;
+    return length( uri_unescape( $body ) );
+    }
+  }
+
+sub words_stripped
+  {
+  my ($sth,@row);
+  $sth = $dbh->prepare("select body from pages as p,valid_domains as d where p.url=? and d.domain=? and d.id=p.domain_id and p.active");
+  $sth->execute($url,$dom);
+  @row = $sth->fetchrow_array;
+  if ($#row < 0)
+    {return "error: strange, body not found..."}
+  else
+    {
+    my $body=$row[0];
+    $body =~ s/<[^<]*>//g;
+    my $len=length( uri_unescape($body));
+    return (int( $len / 5 )+1);
+    }
+  }
+
+sub generate_pw
+  {
+  my $alpha='abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789~!@#$%^&*()_+-={}[];:,.<>?/\|';
+  my $temp=q//;
+  for (1..20){$temp=$temp.substr($alpha,int(rand(91)),1);}
+  $temp =~ s/\</&lt;/g;
+  return "<pre>$temp</pre>";
+  }
+
 sub edit {
+    # if ( $ip ne '72.201.204.99' ) { return q/ /; }
     if ( $ip !~ /^192[.]168[.]1[.]/ ) { return }
     else {
         return
@@ -200,21 +272,23 @@ sub created {
 }
 
 sub allpages {
-    my ( @r, $ret, $sth );
+    my ( @r, $ret, $sth,$count );
 
     $sth = $dbh->prepare(
-'SELECT url,d.domain FROM pages AS p,valid_domains AS d WHERE d.domain=? and active and p.domain_id=d.id'
+'SELECT url,d.domain FROM pages AS p,valid_domains AS d WHERE d.domain=? and active and p.domain_id=d.id order by p.creation_time DESC'
     ) or carp $STDERR;
     $sth->execute($dom) or carp $STDERR;
     @r = $sth->fetchrow_array;
+    $count=1;
     if ( $#r < 0 ) { return "no pages found for $dom at all!!" }
     else {
   # todo: think about loading this from a snippets table, then do bunch of s///;
         $ret =
-"<h4>Pages on $dom</h4><a href=\"http://$r[1]$r[0]\">$r[1]$r[0]</a><br>";
+"<h4>Pages on $dom</h4><div style='display: inline-block; width: 50px; '>$count </div><div style='display: inline-block; '><a href=\"http://$r[1]$r[0]\"> $r[1]$r[0]</a></div><br>";
     }
     while ( @r = $sth->fetchrow_array ) {
-        $ret .= "<a href=\"http://$r[1]$r[0]\">$r[1]$r[0]</a><br>";
+	$count++;
+        $ret .= "<div style='display: inline-block; width: 50px; '>$count </div><div style='display: inline-block; '><a href=\"http://$r[1]$r[0]\">$r[1]$r[0]</a></div><br>";
     }
     return $ret;
 }
@@ -223,6 +297,7 @@ sub handler {
     my $r = shift;
     my $rc;
     init_db($r);
+    if ( $ENV{SERVER_PORT} == 443){ warn "$ip on $dom$url:$ENV{SERVER_PORT}\n"}
     if ( $method eq 'GET' )    { $rc = handle_get($r)        }
     if ( $method eq 'POST' )   { $rc = handle_post($r)       }
     if ( $method eq 'HEAD' )   { $rc = handle_head($r)       }
@@ -328,8 +403,18 @@ sub handle_api_call {
         $newbody = after_snippets($newbody);
         output_body( $r, $newbody, 'text/html' );
     }
+    if ( $url eq '/api/change_pw' ) {
+        my $newbody = $api{'/api/change_pw'};
+        $newbody =~ s/__USERNAME__/$whoami/smx;
+        $newbody = after_snippets($newbody);
+        output_body( $r, $newbody, 'text/html' );
+    }
     if ( $url eq '/api/register' ) {
         output_body( $r, $api{'/api/register'}, 'text/html' );
+    }
+    if ( $url eq '/api/delete_page') {
+	output_body( $r, 'ERROR: please do not call /api/delete_page diretly',
+	    'text/html' );
     }
     if ( $url eq '/api/add_page' ) {
         output_body( $r, 'ERROR: please do not call /api/add_page directly',
@@ -424,9 +509,6 @@ sub handle_get {
     my ( $sth, @row, $body );
     if ( $url =~ /^\/api\//smx ) { return handle_api_call($r) }
 
-    # if ($query eq 'debug'){
-    #  $r->print("looking for ",uri_unescape($url)," in db<br>\n");
-    # }
     $sth = $dbh->prepare(
 'SELECT body FROM pages AS p,valid_domains AS d WHERE p.url=? and d.domain=? and p.active and p.domain_id=d.id'
     );
@@ -435,16 +517,28 @@ sub handle_get {
     if ( $#row < 0 )    # can't find $dom$url in pages table
     {
         if   ( $query eq 'edit' ) { create_page($r) }
+	elsif ( $query eq 'delete') { return error_404($r) }
         else                      { return error_404($r) }
     }
     else                # $dom$url is in pages table
     {
         if ( $query eq 'edit' ) { edit_page( $r, $row[0] ) }
+        elsif ($query eq 'delete') {delete_form($r)} 
         else                    { process_the_page( $r, $row[0] ) }
     }
 
     return;
 }
+sub delete_form
+  {
+  my $r=shift;
+  my $body=$api{'/api/delete_page'};
+  $body =~ s/__DOMAIN__/$dom/gsmx;
+  $body =~ s/__URL__/$url/gsmx;
+  $body = after_snippets($body);
+  output_body( $r, $body, 'text/html' ) ;
+  return;
+  }
 
 sub process_the_page {
     my ( $r, $body ) = @_;
@@ -535,31 +629,84 @@ sub no_api_endpoint {
 
 sub handle_post {
     my $r = shift;
-
-    #     print "got to handle_post dom=$dom url=$url\n";
     my $sth = $dbh->prepare('SELECT url FROM api_endpoints WHERE url=?');
     $sth->execute($url);
     my @row = $sth->fetchrow_array;
     if ( $#row == 0 ) {
-        if ( $url eq '/api/add_page' ) { return store_page($r) }
-        if ( $url eq '/api/login' )    { return login($r) }
-        if ( $url eq '/api/register' ) { return register($r) }
+        if ( $url eq '/api/add_page' )    { return store_page($r)  }
+        if ( $url eq '/api/delete_page' ) { return delete_page($r) }
+        if ( $url eq '/api/login' )       { return login($r)       }
+        if ( $url eq '/api/register' )    { return register($r)    }
+        if ( $url eq '/api/change_pw')    { return change_pw($r)   }
     }
     else { return no_api_endpoint($r) }
     return;
 }
+sub change_pw
+  {
+  my $r    = shift;
+  if (! $session)
+    { 
+    print "Please login before trying to change passwords\n";
+    return;
+    }
+  my %args = %{ split_input($r) };
 
+  # we have a session, so $whoami should be the right username, right?
+  my @row=get_pw_hashes($whoami);
+
+  # first check for regular pw, new1 should match new2
+  if ($args{new1_password} && $args{new2_password} && $args{old_password})
+    {
+    if ($args{new1_password} eq $args{new2_password})
+      {
+      if ( check_pw( $args{old_password}, $row[0] ))
+        {
+	my $encrypted = encrypt_password( $args{new1_password} );
+        my $sth=$dbh->do("update user_data set password='$encrypted' where username='$whoami' ")or carp $STDERR;
+        remove_session_cookie($r);
+	print "<html><body>login pw updated <a href=\"http://$dom/api/login\">LOGIN</a>\n</body></html>";
+ 	} 
+      else
+        { print "login pw change failed\n" }
+      }
+    else
+      {print "New passwords have to match\n" }
+    }
+  # next check for delete pw
+  if ($args{new1_delete_password} && $args{new2_delete_password} && $args{old_delete_password} )
+    {
+    if ($args{new1_delete_password} eq $args{new2_delete_password})
+      {
+      if ( check_pw( $args{old_delete_password}, $row[3] ))
+        {
+	print "delete pw updated\n";
+	my $encrypted = encrypt_password( $args{new1_delete_password} );
+        my $sth=$dbh->do("update user_data set delete_password='$encrypted' where username='$whoami' ")or carp $STDERR;
+	}
+      else
+        { print "delete pw change failed\n" }
+      }
+    else
+      {print "New delete passwords have to match\n" }
+    }
+  return;
+  }
+sub get_pw_hashes
+  {
+  my $username=shift;
+  my $sth  = $dbh->prepare( 'SELECT password,useruuid,username,delete_password FROM user_data WHERE username=?') or carp $STDERR;
+  $sth->execute( $username );
+  my @row = $sth->fetchrow_array;
+  return (@row);
+  }
 sub login {
     my $r    = shift;
     my %args = %{ split_input($r) };
-    my $sth  = $dbh->prepare(
-        'SELECT password,useruuid,username FROM user_data WHERE username=?');
-    $sth->execute( $args{username} );
-    my @row = $sth->fetchrow_array;
-    if ( check_pw( $args{password}, $row[0] ) ) {
+    my ($pw_hash,$set_useruuid,$username,$delete_pw_hash)=get_pw_hashes($args{username});
+    if ( check_pw( $args{password}, $pw_hash ) ) {
 
         my $session_uuid = APR::UUID->new->format;
-        my $set_useruuid = $row[1];
         my $now          = time;
 
         my $location = "http://$dom/";
@@ -579,7 +726,7 @@ sub login {
         # we'll load the max-age for sessions from a user setting later...
         #
 
-        $sth = $dbh->prepare(
+        my $sth = $dbh->prepare(
 "INSERT INTO sessions (sessionuuid,remote_addr,last_access,last_login,domain_id,userid) SELECT '$session_uuid','$ip',$now,$now,d.id,u.id FROM valid_domains AS d, user_data AS u WHERE d.domain='$dom' and u.username=?"
         );
         $sth->execute( $args{'username'} );
@@ -590,16 +737,8 @@ sub login {
         $r->status(Apache2::Const::REDIRECT);
         return Apache2::Const::REDIRECT;
     }
-    else {
-        # $r->print("<h4>Login failed</h4><br>\n")
-
-        output_body( $r, "<h4>Login failed</h4><br>\n", 'text/html' );
-
-    }
-    return;
-}
-
-sub add_session {
+    else
+      { output_body( $r, "<h4>Login failed on $dom</h4><br>\n", 'text/html' ) }
     return;
 }
 
@@ -648,10 +787,52 @@ sub deactivate_old_versions
   $sth->execute( $u,$did ) or carp $STDERR;
   return;
   }
+sub delete_page
+  {
+  my $r=shift;
+  my ($sth,%args,@row);
+  if (! $session)
+    {print "Only the logged in page owner can delete pages.";return}
+  # if ( $ip ne '72.201.204.99' )
+  if ($ip !~ /192[.]168[.]1[.]/ )
+    {
+    error_forbidden( $r, 'Error 403: Deletion not allowed from $ip.' );
+    return;
+    }
+  %args = %{ split_input($r) };
+#  print "trying to delete $args{dom}$args{url}\n";
+
+  $sth  = $dbh->prepare( 'SELECT delete_password,u.username,p.userid,url,p.domain_id FROM user_data as u,pages as p,valid_domains as d WHERE u.username=? and url=? and domain=? and p.domain_id=d.id and p.userid=u.id');
+  $sth->execute( $whoami,$args{url},$args{dom} );
+  @row = $sth->fetchrow_array;
+  if ($#row < 0)
+    {
+    print "query failed, do you own this page?\n";
+    $sth = $dbh->prepare('SELECT u.username,d.domain,url from pages as p, valid_domains as d, user_data as u where url=? and d.domain=? and d.id=p.domain_id and p.userid = u.id') or carp $STDERR;
+    $sth->execute($args{url}, $args{dom});
+    @row=$sth->fetchrow_array;
+    # this will only be reached, I hope, for users logged in that dont own 
+    # the page...
+    print "$row[0] owns $row[1]$row[2]\n";
+    }
+#  print "got $row[1] $row[2] for $row[3]\n";
+  if ( check_pw( $args{pw}, $row[0] ) )
+    {
+    my $domain_id=$row[4];
+    # print "found matching pw for $row[1]\n"
+    $sth=$dbh->prepare("update pages set active='FALSE' where domain_id=? and url=?") or carp $STDERR;
+    $sth->execute($domain_id,$args{url});
+    print "$args{dom}$args{url} deleted\n";
+    }
+  else 
+    { print "incorrect delete password\n" }
+  return;
+  }
 sub store_page {
     my $r = shift;
     my ( $sth, @row, $domain_id, %args, $new_version, $owner_uuid );
     if ( $ip !~ /^192[.]168[.]1[.]/ ) {
+    # if ( $ip ne '72.201.204.99' ) {
         error_forbidden( $r, 'Error 403: posting not allowed, right now.' );
         return;
     }
@@ -789,6 +970,21 @@ sub output_body {
     $r->content_type($content_type);
     $r->print($body);
     return;
+}
+
+sub encrypt_password {
+    my $password = shift;
+    my $salt     = shift || salt();
+    my $hash     = Crypt::Eksblowfish::Bcrypt::bcrypt_hash(
+        {
+            key_nul => 1,
+            cost    => 8,
+            salt    => $salt,
+        },
+        $password
+    );
+
+    return join( '-', $salt, Crypt::Eksblowfish::Bcrypt::en_base64($hash) );
 }
 
 sub salt {

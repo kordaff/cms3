@@ -49,3 +49,21 @@ for i in mod_perl perl-apache-dbi perl-cgi-cookie perl-class-mix perl-crypt-eksb
 # -- More notes to follow once I do this install one more time by cloning the - 
 # -- git repo.  Had to massively fix store_page in cms3.pm this time.         -
 # -----------------------------------------------------------------------------
+
+mkdir -p /var/www/default
+mkdir /var/www/html
+mkdir -p /var/www/cms3/js
+mkdir /var/www/cms3/css
+mkdir /var/www/cms3/images
+mkdir /var/www/cms3/fonts
+
+cp /etc/httpd/conf/httpd.conf /etc/httpd/conf/orig.conf
+cp httpd.conf /etc/httd/conf/
+
+ln -s /var/log/httpd /etc/httpd/logs
+
+# this line is specific to Arch Linux
+#   for other flavors, locate vendor_perl and create MyApache2 directory in it, and put cms3.pm
+#   there.  You'll need to alter the httpd.conf to match, for Apache2::Reload
+mkdir /usr/share/perl5/vendor_perl/MyApache2/
+

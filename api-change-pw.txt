@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<title>Change password(s)</title>
+</head>
+<body>
+<form action="http://~~dom~~/api/change_pw" method="post">
+<input type="hidden" name="username" value="__USERNAME__">
+Change one or both passwords:<br>
+Current Login Password:<input type="password" name="old_password" value=""><br>
+New Password:<input type="password" name="new1_password" value=""><br>
+Repeat New Password:<input type="password" name="new2_password" value=""><br>
+<br><br>
+Current Delete Password:<input type="password" name="old_delete_password" value=""><br>
+New Delete Password:<input type="password" name="new1_delete_password" value=""><br>
+Repeat New Password:<input type="password" name="new2_delete_password" value=""><br>
+<input type="submit" value="submit">
+</form>
+</body>
+</html>

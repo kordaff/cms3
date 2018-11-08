@@ -1,25 +1,33 @@
 # cms3
 This is the 3rd iteration of my mod_perl2 response handler that acts as a CMS using Apache and PostgreSQL.
 
+This is version 3.2
 
-This commit version has a lot of changes.  Different dbname and dbuser as I had
-someone suspend my domain, userconfig.cf   No notice, no warning.  All I do on
-it is post notes about what I'm working on with cms3...  It must have been tasty
-for someone to pull that.  No more using free domains from dot.tk for me.
+Implemented: url?delete function to deactivate unwanted pages.  To fully remove the pages from the 
+database, use psql cms3 cms3
+Then, DELETE FROM pages where not active;
 
-So, new dbuser and dbname are cms3   Test domain is at cms3.perl-user.com
-I changed the example httpd.conf with the new variables.
+Voila, all the previous versions of pages are permanently gone (for now, might want to save them 
+for historical purposes without them being available to roll back to (once implemented)
 
-This is a pretty major increase of code, including a full rework and refactor
-of my store_page subroutine.   It shouldn't stomp on version_num for a 
-particular page now, even when the active page is rolled back to a previous 
-version.
+Also implemented /api/change_pw to change either the login password or delete password (delete takes
+a separate password just for fun - considering setting a cookie for the duration of the session so 
+it only needs to be entered once per browser session)
 
-There was also a lot of changes to the database requiring a lot of queries to 
-become multi table queries.   The database is normalized quite a bit better.
-There is also a valid_domains table that gets initialized with the domain name
-specified in init-tables.pl and a domain of 'ALL' for /api urls.   Most 
-specifically, /api/login and /api/add_page get __DOMAIN__ tags replace with the current domain being accessed.
+This version still needs a complete run through with perlcritic -brutal...
 
-New ideas for my TODO list on http://cms3.perl-user.com/
+I'm just about to the point where a full install on Arch will be doable, more or less.  Getting 
+postgres to run commands under su has proven problematic.  I'm probably doing something wrong =)
+
+I've also begun to try and learn docker.  This app would just work in Docker I think.  It needs an
+/api/add_domain, /api/delete_domain, and maybe a few others before that though.  /api/change_domain
+would be pretty doable too.  I started using the ~~dom~~ snippet in my pages so when i switch the
+domain, the pages work just fine on the new domain.  Need to do that with my.css too, had to change
+a bunch of pages that were looking for that on cms3.perl-user.com which I deactivated/removed.
+
+I rolled posts and pages from cms3.perl-user.com into perl-user.com and moved it over to cms3 from
+the previous version, Lynk2.pm (at least it was properly cased lol - perlcritic doesn't like 
+cms3.pm as a module name).
+
+Current TODO list:  http://perl-user.com/todo
 
