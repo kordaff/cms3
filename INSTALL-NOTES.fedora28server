@@ -52,7 +52,7 @@ perl init-tables.pl
 -----------------
 Installing cms3.pm
 
-I usually put cms3 in a folder called MyApache2 that I create in vendor_perl
+Put cms3.pm in a folder called MyApache2 that I usually create in vendor_perl
 Depending on the distro, you may have to find site_perl instead.  The mlocate
 package helps a great deal with this, just remember to run updatedb after installing it.  
 
