@@ -58,7 +58,11 @@ mkdir /var/www/cms3/images
 mkdir /var/www/cms3/fonts
 
 cp /etc/httpd/conf/httpd.conf /etc/httpd/conf/orig.conf
-cp httpd.conf /etc/httd/conf/
+cp httpd.conf /etc/httpd/conf/
+
+# note, change the ServerAdmin email address
+#       and the two (different) IP addresses to match what you have for public IP (or to same private
+#       ip on your LAN)
 
 ln -s /var/log/httpd /etc/httpd/logs
 
