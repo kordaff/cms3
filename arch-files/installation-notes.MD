@@ -1,9 +1,9 @@
-# broke on newest ARCH, needs pacman -S perl-linux-pid
+#!/bin/bash
+# Oct 24 2019:
+# broke on current ARCH, needs pacman -S perl-linux-pid
 # also got to be sure to add user acct to sudo with visudo.   As visudo uses vi by default
 # I added a Defaults editor=/usr/bin/vim to /etc/sudoers to avoid having to install vi
 # although more often than not, i type vi instead of vim.
-
-#!/bin/bash
 
 # Start to finish, install Arch, install all these packages, reconfigure httpd, configure cms3
 
