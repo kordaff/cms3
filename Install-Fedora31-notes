@@ -1,0 +1,4 @@
+dnf install postgresql-server postgresql httpd git perl-Apache-DBI mod_perl \
+  perl-Apache-Reload perl-DBD-Pg perl-DateTime perl-URI-Escape-XS \
+  perl-Crypt-Eksblowfish perl-Crypt-Random-Source perl-Email-Address perl-MIME-Lite\
+  perl-CGI perl-Readonly
