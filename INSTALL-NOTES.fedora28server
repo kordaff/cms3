@@ -1,7 +1,10 @@
 After installing Fedora 28:
 ---------------------------
 
-dnf install postgresql-server postgresql httpd git perl-Apache-DBI install mod_perl install perl-Apache-Reload install perl-DBD-Pg install perl-DateTime install perl-URI-Escape-XS perl-Crypt-Eksblowfish perl-Crypt-Random-Source perl-Email-Address perl-MIME-Lite perl-CGI perl-Readonly
+# noticed after doing an upgrade to Fedora 31 that this line was hopelessly fubar
+# removing the extra 'install' commands helped...
+
+dnf install postgresql-server postgresql httpd git perl-Apache-DBI mod_perl perl-Apache-Reload perl-DBD-Pg perl-DateTime perl-URI-Escape-XS perl-Crypt-Eksblowfish perl-Crypt-Random-Source perl-Email-Address perl-MIME-Lite perl-CGI perl-Readonly
 
 # should probably include which zone to add this to, but...
 firewall-cmd --add-service http
