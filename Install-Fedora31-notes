@@ -10,6 +10,10 @@ semanage port -a -t ssh_port_t -p tcp 2200
 systemctl stop sshd
 systemctl start sshd
 
+# add http to firewall too
+firewall-cmd --add-service http
+firewall-cmd --add-service http --permanent
+
 dnf install postgresql-server postgresql httpd git perl-Apache-DBI mod_perl \
   perl-Apache-Reload perl-DBD-Pg perl-DateTime perl-URI-Escape-XS \
   perl-Crypt-Eksblowfish perl-Crypt-Random-Source perl-Email-Address perl-MIME-Lite\
