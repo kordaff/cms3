@@ -1,18 +1,20 @@
-# moved sshd to port 2200
+# while running on a Linode VPS, I moved sshd to port 2200
 
-firewall-cmd --list-all-zones | more
-firewall-cmd --zone=FedoraServer --add-port=2200/tcp
-firewall-cmd --permanent --zone=FedoraServer --add-port=2200/tcp
-semanage port -a -t ssh_port_t -p tcp 2200
+# firewall-cmd --list-all-zones | more
+# firewall-cmd --zone=FedoraServer --add-port=2200/tcp
+# firewall-cmd --permanent --zone=FedoraServer --add-port=2200/tcp
+# semanage port -a -t ssh_port_t -p tcp 2200
 
 # changed Port 22 to Port 2200 in /etc/ssh/sshd_config
 # restarted sshd and verified it was working on 2200 before logging out.
-systemctl stop sshd
-systemctl start sshd
+# systemctl stop sshd
+# systemctl start sshd
 
 # add http to firewall too
-firewall-cmd --add-service http
-firewall-cmd --add-service http --permanent
+# firewall-cmd --add-service http
+# firewall-cmd --add-service http --permanent
+# This time, on F35, I'm running on a vm, so the port will be 8000 for httpd and 
+# no exposed sshd
 
 yum install postgresql-server postgresql httpd git perl-Apache-DBI mod_perl \
   perl-Apache-Reload perl-DBD-Pg perl-DateTime perl-URI-Escape-XS \
@@ -24,19 +26,10 @@ yum install postgresql-server postgresql httpd git perl-Apache-DBI mod_perl \
 
 # as postgres on Fedora:  initdb -D /var/lib/pgsql/data
 
-# for other systems, add /data to what pwd shows in postgres's home directory
-# on Arch Linux, it's /var/lib/postgres/data
-
-as root:  systemctl start postgresql
-
-as postgres:
-
-createuser cms3
-createdb cms3 -O cms3
-
-as root: 
-
-systemctl restart postgresql
+As postgres, run initdb
+As root, systemctl enable postgresl; systemctl start postgresql
+As postgres, createuser cms3 ; createdb cms3 -O cms3
+As root, systemctl restart postgresql
 
 # Fedora allows connections from the localhost to PostgreSQL
 #   have not tested putting Apache on one VM and PG on another
