@@ -1,3 +1,5 @@
+Having a few issues with installing this to run on port 8001.   My code needs some work lol.
+
 # while running on a Linode VPS, I moved sshd to port 2200
 
 # firewall-cmd --list-all-zones | more
