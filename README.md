@@ -29,5 +29,5 @@ I rolled posts and pages from cms3.perl-user.com into perl-user.com and moved it
 the previous version, Lynk2.pm (at least it was properly cased lol - perlcritic doesn't like 
 cms3.pm as a module name).
 
-Current TODO list:  http://perl-user.com/todo
+Current TODO list:  todo
 
