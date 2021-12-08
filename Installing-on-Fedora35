@@ -1,32 +1,12 @@
-Having a few issues with installing this to run on port 8001.   My code needs some work lol.
-
-# while running on a Linode VPS, I moved sshd to port 2200
-
-# firewall-cmd --list-all-zones | more
-# firewall-cmd --zone=FedoraServer --add-port=2200/tcp
-# firewall-cmd --permanent --zone=FedoraServer --add-port=2200/tcp
-# semanage port -a -t ssh_port_t -p tcp 2200
-
-# changed Port 22 to Port 2200 in /etc/ssh/sshd_config
-# restarted sshd and verified it was working on 2200 before logging out.
-# systemctl stop sshd
-# systemctl start sshd
-
-# add http to firewall too
+# add http to firewall
 # firewall-cmd --add-service http
 # firewall-cmd --add-service http --permanent
-# This time, on F35, I'm running on a vm, so the port will be 8000 for httpd and 
-# no exposed sshd
-
 yum install postgresql-server postgresql httpd git perl-Apache-DBI mod_perl \
   perl-Apache-Reload perl-DBD-Pg perl-DateTime perl-URI-Escape-XS \
   perl-Crypt-Eksblowfish perl-Crypt-Random-Source perl-Email-Address perl-MIME-Lite\
   perl-CGI perl-Readonly
   
-# note: in F28, it was dnf, not sure where it switched back to yum =)
 # Next, configure PostgreSQL
-
-# as postgres on Fedora:  initdb -D /var/lib/pgsql/data
 
 As postgres, run initdb
 As root, systemctl enable postgresl; systemctl start postgresql
@@ -103,11 +83,12 @@ once happy with passwords, email, and domain, run:
 perl init-tables.pl
 
 also run:
+perl load-login.pl
+perl load-add_page.pl
 perl load-delete_page.pl
-# otherwise you're missing the page with form to take the delete pw to delete a page.
 
 -----------------
-To configure Apache2 on Fedora 28, all I had to do was edit example-httpd.conf to change the server name to the domain I was using on this new Fedora 28 VM set
+To configure Apache2 on Fedora 35 edit example-httpd.conf to change the server name to the domain I was using on this new Fedora 28 VM set
 the listen to your machines IP and ServerName to your machines IP (this assumes
 that you have nothing else configured, ymmv greatly there, if you do)
 
