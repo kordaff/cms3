@@ -93,7 +93,7 @@ the listen to your machines IP and ServerName to your machines IP (this assumes
 that you have nothing else configured, ymmv greatly there, if you do)
 
 cp /etc/httpd/conf/httpd.conf /etc/httpd/conf/orig.conf
-cp example-httpd.conf >> /etc/httpd/conf/httpd.conf
+cat example-httpd.conf >> /etc/httpd/conf/httpd.conf
 
 mkdir /var/www/cms3
 mkdir /var/www/cms3/images
@@ -126,3 +126,14 @@ Now it's fifth in the yum install list at the top.
 # end
 
 # first page that comes up is a copy of /welcome that the init-pages.pl script installs.
+
+Testing after install
+
+Do something like http://your-domain/x?edit
+Add content and submit
+
+First time is to create the page.
+Second time is to update it.
+
+http://your-domain/x?delete
+Should let you delete /x with the password you put in init-tables.pl
