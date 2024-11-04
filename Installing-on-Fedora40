@@ -1,3 +1,8 @@
+Installed this on Fedora41 (found a bug in admin/delete-page pws - it isn't yet decoding the passwords
+  it gets from the delete page form - pretty sure same case with /api/login form too.
+Uploaded a change-delete-pw.pl script to update db with a new pw when this happens.
+  a password of @@@ comes back undecoded as %21%21%21
+
 # add http to firewall
 # firewall-cmd --add-service http
 # firewall-cmd --add-service http --permanent
