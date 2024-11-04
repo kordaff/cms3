@@ -23,6 +23,12 @@ my $ALL_domain_id   = 0;
 ##################
 my $password   = 'admin';
 my $del_passwd = '123';
+#
+# while testing on a Fedora41 machine, I found a bug.  Delete page password and perhaps Admin password
+# need to be alphanumeric - it wasn't decoding the !@# i had in one of them.   TODO: fix that.
+#
+# Also, add change-delete-password.pl script to repo and make another to change admin pw.
+#
 my $email = 'change_me@perl-user.com';
 my $domain = 'some-test-vm.perl-user.com';
 ##################
