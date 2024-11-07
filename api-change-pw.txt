@@ -6,6 +6,13 @@
 <title>Change password(s)</title>
 </head>
 <body>
+
+<p>
+Left this in the repo, can add it in a page, like url/change_pw?edit
+Just did that and it worked - note changing admin pw gets you logged out
+I think I prefer using the script: change-admin-pw.pl or change-delete-pw.pl instead...
+</p>
+
 <form action="http://~~dom~~/api/change_pw" method="post">
 <input type="hidden" name="username" value="__USERNAME__">
 Change one or both passwords:<br>
